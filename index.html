@@ -610,7 +610,17 @@ document.querySelectorAll('.chip').forEach(chip => chip.addEventListener('click'
 
 /* ===== Sacola ===== */
 let sacola = {};
-try { sacola = JSON.parse(localStorage.getItem('lapidar-sacola') || '{}') || {}; } catch(e) { sacola = {}; }
+try {
+  const dados = JSON.parse(localStorage.getItem('lapidar-sacola') || '{}');
+  if (dados && typeof dados === 'object' && !Array.isArray(dados)) {
+    for (const produto of PRODUTOS) {
+      const quantidade = dados[produto.id];
+      if (Object.hasOwn(dados, produto.id) && Number.isSafeInteger(quantidade) && quantidade > 0) {
+        sacola[produto.id] = quantidade;
+      }
+    }
+  }
+} catch(e) { sacola = {}; }
 const salvar = () => { try { localStorage.setItem('lapidar-sacola', JSON.stringify(sacola)); } catch(e){} };
 const porId = id => PRODUTOS.find(p => p.id === id);
 const drawer = document.getElementById('drawer'), scrim = document.getElementById('scrim');
