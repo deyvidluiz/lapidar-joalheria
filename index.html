@@ -664,6 +664,13 @@ document.getElementById('bagBody').addEventListener('click', e => {
   if (t.dataset.dec) { sacola[t.dataset.dec]--; if (sacola[t.dataset.dec] <= 0) delete sacola[t.dataset.dec]; }
   if (t.dataset.rm) delete sacola[t.dataset.rm];
   salvar(); renderSacola();
+  // A renderização substitui os botões: mantenha o foco na ação equivalente.
+  if (t.dataset.inc || t.dataset.dec || t.dataset.rm) {
+    const acao = t.dataset.inc ? 'inc' : t.dataset.dec ? 'dec' : 'rm';
+    const id = t.dataset[acao];
+    const proximo = [...drawer.querySelectorAll(`[data-${acao}]`)].find(b => b.dataset[acao] === id);
+    (proximo || document.getElementById('closeBag')).focus();
+  }
 });
 
 const toast = document.getElementById('toast'); let toastT;
@@ -680,12 +687,47 @@ grid.addEventListener('click', e => {
 });
 
 let ultimoFoco = null;
-function abrir(){ ultimoFoco = document.activeElement; scrim.hidden = false; drawer.removeAttribute('inert'); drawer.setAttribute('aria-hidden','false'); requestAnimationFrame(()=>drawer.classList.add('open')); document.getElementById('closeBag').focus(); }
-function fechar(){ drawer.classList.remove('open'); drawer.setAttribute('aria-hidden','true'); drawer.setAttribute('inert',''); scrim.hidden = true; if (ultimoFoco) ultimoFoco.focus(); }
+let fundoInerte = [];
+function abrir(){
+  if (drawer.getAttribute('aria-hidden') === 'false') return;
+  ultimoFoco = document.activeElement;
+  fundoInerte = [...document.body.children]
+    .filter(el => ![drawer, scrim, toast].includes(el) && !['SCRIPT', 'STYLE'].includes(el.tagName))
+    .map(el => [el, el.inert]);
+  fundoInerte.forEach(([el]) => { el.inert = true; });
+  scrim.hidden = false;
+  drawer.removeAttribute('inert');
+  drawer.setAttribute('aria-hidden','false');
+  requestAnimationFrame(() => {
+    if (drawer.getAttribute('aria-hidden') === 'false') drawer.classList.add('open');
+  });
+  document.getElementById('closeBag').focus();
+}
+function fechar(){
+  drawer.classList.remove('open');
+  drawer.setAttribute('inert','');
+  scrim.hidden = true;
+  fundoInerte.forEach(([el, inerte]) => { el.inert = inerte; });
+  fundoInerte = [];
+  if (ultimoFoco && ultimoFoco.isConnected) ultimoFoco.focus();
+  drawer.setAttribute('aria-hidden','true');
+}
 document.getElementById('openBag').onclick = abrir;
 document.getElementById('closeBag').onclick = fechar;
 scrim.onclick = fechar;
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && drawer.classList.contains('open')) fechar(); });
+document.addEventListener('keydown', e => {
+  if (drawer.getAttribute('aria-hidden') !== 'false') return;
+  if (e.key === 'Escape') { e.preventDefault(); fechar(); return; }
+  if (e.key !== 'Tab') return;
+  const focaveis = [...drawer.querySelectorAll('a[href], button, input, select, textarea, [tabindex]')]
+    .filter(el => !el.disabled && el.tabIndex >= 0 && el.getClientRects().length);
+  const primeiro = focaveis[0], ultimo = focaveis[focaveis.length - 1];
+  if (e.shiftKey && document.activeElement === primeiro) {
+    e.preventDefault(); ultimo.focus();
+  } else if (!e.shiftKey && document.activeElement === ultimo) {
+    e.preventDefault(); primeiro.focus();
+  }
+});
 renderSacola();
 
 /* ===== Guia de aros (numeração brasileira: aro ≈ circunferência em mm − 40) ===== */
